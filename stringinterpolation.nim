@@ -1,9 +1,5 @@
 
 import macros
-import typetraits
-import nre
-import optional_t
-import sets
 
 
 macro appendVarargs(c: expr, e: expr): expr =
@@ -76,26 +72,8 @@ proc typeSpecifier(m: FormatStringMatch): char =
   else:
     '\0'
 
+
 proc parseFormatString(s: string): FormatStringMatch =
-  if s[0] == '%':
-    return FormatStringMatch(kind: fsPct)
-
-  let flags     = r"(-|\+| |0|#)*" # r"-?\+? ?0?#?" this is order dep, but the new allows multiples...
-  let width     = r"\d*"
-  let precision = r"(\.\d+)?" # optional, if given min 1 digit
-  let length    = r"(h|hh|l|ll|L|j|z|t)?"
-  let specifier = r"[diufFeEgGxXoscppaAn]"
-
-  let regexp = re(flags & width & precision & length & specifier)
-  let mo = s.match(regexp)
-  if mo.isSome:
-    let m = mo.get
-    return FormatStringMatch(kind: fsMatch, s: m.match)
-
-  return FormatStringMatch(kind: fsInvalid)
-
-
-proc parseFormatStringStupid(s: string): FormatStringMatch =
   ## non-re version
   if s[0] == '%':
     return FormatStringMatch(kind: fsPct)
@@ -130,7 +108,7 @@ when false:
   ]
   for s in strings:
     let m = parseFormatString(s)
-    let m2 = parseFormatStringStupid(s)
+    let m2 = parseFormatString(s)
     echo "Expression: '", s, "' => ", m, " match len: ", m.len, "   ", m2
     #assert m.kind == m2.kind
     #assert m.len == m2.len
@@ -145,7 +123,7 @@ proc extractFormatStrings(s: string): seq[FormatStringMatch] =
     let c = s[i]
     echo s, i, c, result
     if c == '%':
-      let m = parseFormatStringStupid(s[i+1..^1]) 
+      let m = parseFormatString(s[i+1..^1]) 
       if m.kind == fsMatch:
         result.add(m)
       i += m.len
@@ -249,7 +227,7 @@ proc isValidExpr(s: string): bool {.compileTime.} =
 
 
 
-macro ifmt(formatStringNode: string): expr =
+macro ifmt*(formatStringNode: string): expr =
 
   let formatString = formatStringNode.strVal
 
@@ -306,7 +284,7 @@ macro ifmt(formatStringNode: string): expr =
         outArgs.add(newIdentNode(buffer))
         let substr = formatString[i+1..^1]
         echo "substr: ", substr
-        let formatter = parseFormatStringStupid(substr)
+        let formatter = parseFormatString(substr)
         echo "formatter: ", formatter
         
         case formatter.kind:
@@ -340,7 +318,7 @@ macro ifmt(formatStringNode: string): expr =
           if c == '%':
             let substr = formatString[i+1..^1]
             echo "substr: ", substr
-            let formatter = parseFormatStringStupid(substr)
+            let formatter = parseFormatString(substr)
             echo "formatter: ", formatter
 
             case formatter.kind:
