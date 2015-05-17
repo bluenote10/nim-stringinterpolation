@@ -79,21 +79,25 @@ template formatUnsafe*(formatString: string, args: varargs[expr]): string =
   ## This means that it is possible to use dynamic string format strings, e.g.
   ## formatUnsafe("%" & $dynamicNumberOfDigits & "d", 1_000_000)
 
-  # determine the required size first
-  let requiredSize = appendVarargs(snprintf(nil, 0, formatString), args)
-  # note: method call syntax passes a different tree!
+  # first call
+  const initSize = 256
+  var result = newStringOfCap(initSize)
+  var written = appendVarargs(snprintf(cast[ptr cchar](result.cstring), initSize, formatString), args)
+  let requiredSize = written + 1 # required size is +1 since the '\0' is not considered in 'written'
 
-  if requiredSize < 0:
+  if written < 0:
     raise newException(ValueError, "illegal format string \"" & formatString & "\"")
+  elif requiredSize <= initSize:
+    result.setlen(written)
+  else:
+    # second call required
+    result = newStringOfCap(requiredSize)
 
-  # now create string of appropriate size
-  var s = newStringOfCap(requiredSize + 1) # +1 because requiredSize does not include '\0'
+    # call snprintf again (we can discard the size this time)
+    written = appendVarargs(snprintf(cast[ptr cchar](result.cstring), requiredSize, formatString), args)
+    result.setlen(written)
 
-  # call snprintf again (we can discard the size this time)
-  discard appendVarargs(snprintf(cast[ptr cchar](s.cstring), requiredSize+1, formatString), args)
-  s.setlen(requiredSize)
-  s
-
+  result
 
 
 macro format*(formatString: string{lit}, args: varargs[expr]): expr =
