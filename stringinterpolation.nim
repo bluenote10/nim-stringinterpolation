@@ -1,54 +1,7 @@
 
 import macros
 
-
-macro appendVarargs(c: expr, e: expr): expr =
-  #echo c.treerepr
-  result = c
-  for a in e.children:
-    result.add(a)
-  #echo result.treerepr
-
-proc snprintf(buffer: ptr cchar, n: csize, formatstr: cstring): cint
-  {.importc: "snprintf", varargs, header: "<stdio.h>".}
-
-template formatUnsafe*(formatString: string, args: varargs[expr]): string =
-  ## performs a string formatting _without_ type checking. On the other hand,
-  ## this allows to pass a formatString which is not a static literal.
-  ## This means that it is possible to use dynamic string format strings, e.g.
-  ## formatUnsafe("%" & $dynamicNumberOfDigits & "d", 1_000_000)
-  
-  # determine the required size first
-  let requiredSize = appendVarargs(snprintf(nil, 0, formatString), args)
-  # note: method call syntax passes a different tree!
-
-  if requiredSize < 0:
-    raise newException(ValueError, "illegal format string \"" & formatString & "\"")
-
-  # now create string of appropriate size
-  var s = newStringOfCap(requiredSize + 1) # +1 because requiredSize does not include '\0'
-
-  # call snprintf again (we can discard the size this time)
-  discard appendVarargs(snprintf(cast[ptr cchar](s.cstring), requiredSize+1, formatString), args)
-  s.setlen(requiredSize)
-  s
-
-
-# TODO: make some unittests
-when false:
-  let s = formatUnsafe("%3d %8.3fX", 42+1, 3.14)
-  echo formatUnsafe("%3d %12.3fX", 42, 3.14)
-  echo s.len
-  echo s
-
-  var digits = 15
-  echo formatUnsafe("%" & $digits & "d", 1_000_000)
-
-  echo formatUnsafe("Hallo 1%% Test")
-
-
-
-
+# helper types to represent printf format string matches
 type
   FormatStringMatchEnum = enum
     fsInvalid, fsPct, fsMatch
@@ -74,7 +27,8 @@ proc typeSpecifier(m: FormatStringMatch): char =
 
 
 proc parseFormatString(s: string): FormatStringMatch =
-  ## non-re version
+  ## helper function tries to parse a printf format string
+  ## from the beginning of ``s``.
   if s[0] == '%':
     return FormatStringMatch(kind: fsPct)
 
@@ -86,42 +40,17 @@ proc parseFormatString(s: string): FormatStringMatch =
 
   return FormatStringMatch(kind: fsInvalid)
 
-when false:
-  let strings = [
-    "%asdf",
-    "ddd",
-    " d",
-    " +-0#d",
-    "f",
-    "d",
-    "s",
-    "5f",
-    "5.1f",
-    ".2f",
-    "50.20f",
-    "5.2.2f",
-    "5.f",
-    "zu",
-    "zzu",
-    "hhd",
-    "hhhhd",
-  ]
-  for s in strings:
-    let m = parseFormatString(s)
-    let m2 = parseFormatString(s)
-    echo "Expression: '", s, "' => ", m, " match len: ", m.len, "   ", m2
-    #assert m.kind == m2.kind
-    #assert m.len == m2.len
-
 
 proc extractFormatStrings(s: string): seq[FormatStringMatch] =
+  ## extracts all printf format strings that are contained
+  ## in ``s``.
 
   result = newSeq[FormatStringMatch]()
   var i = 0
 
   while i < s.len:
     let c = s[i]
-    echo s, i, c, result
+    #echo s, i, c, result
     if c == '%':
       let m = parseFormatString(s[i+1..^1]) 
       if m.kind == fsMatch:
@@ -129,7 +58,42 @@ proc extractFormatStrings(s: string): seq[FormatStringMatch] =
       i += m.len
     inc i
 
-#echo extractFormatStrings("%s %s %.3d")
+
+
+
+
+macro appendVarargs(c: expr, e: expr): expr =
+  ## helper macro to wrap varargs of C calls.
+  result = c
+  for a in e.children:
+    result.add(a)
+
+
+proc snprintf(buffer: ptr cchar, n: csize, formatstr: cstring): cint
+  {.importc: "snprintf", varargs, header: "<stdio.h>".}
+
+
+template formatUnsafe*(formatString: string, args: varargs[expr]): string =
+  ## performs a string formatting _without_ type checking. On the other hand,
+  ## this allows to pass a formatString which is not a static literal.
+  ## This means that it is possible to use dynamic string format strings, e.g.
+  ## formatUnsafe("%" & $dynamicNumberOfDigits & "d", 1_000_000)
+  
+  # determine the required size first
+  let requiredSize = appendVarargs(snprintf(nil, 0, formatString), args)
+  # note: method call syntax passes a different tree!
+
+  if requiredSize < 0:
+    raise newException(ValueError, "illegal format string \"" & formatString & "\"")
+
+  # now create string of appropriate size
+  var s = newStringOfCap(requiredSize + 1) # +1 because requiredSize does not include '\0'
+
+  # call snprintf again (we can discard the size this time)
+  discard appendVarargs(snprintf(cast[ptr cchar](s.cstring), requiredSize+1, formatString), args)
+  s.setlen(requiredSize)
+  s
+
 
 
 macro format*(formatString: string{lit}, args: varargs[expr]): expr =
@@ -137,10 +101,10 @@ macro format*(formatString: string{lit}, args: varargs[expr]): expr =
   ## This is a typesafe version of ``formatUnsafe``. Internally, it performs
   ## type checking and generates a call to ``formatUnsafe``.
 
-  echo formatString.strval
+  #echo formatString.strval
   let formatStrings = extractFormatStrings(formatString.strval)
-  echo formatStrings
-  echo formatStrings.len, " == ", args.len 
+  #echo formatStrings
+  #echo formatStrings.len, " == ", args.len 
   if formatStrings.len != args.len:
     error "number of varargs ("  & $args.len & ") does not match number of string formatters (" & $formatStrings.len & ")"
 
@@ -148,15 +112,15 @@ macro format*(formatString: string{lit}, args: varargs[expr]): expr =
 
   var i = 0
   for fs in formatStrings:
-    echo i
-    echo args[i].treerepr
+    #echo i
+    #echo args[i].treerepr
     let actualType = args[i].getType
     let atk = actualType.typeKind
-    echo "Actual Type: ", actualType.treerepr
-    echo "Actual Type Kind: ", atk
+    #echo "Actual Type: ", actualType.treerepr
+    #echo "Actual Type Kind: ", atk
 
     let typeSpecifier = fs.typeSpecifier
-    echo "Type specifier: ", typeSpecifier
+    #echo "Type specifier: ", typeSpecifier
 
     type TypeMatchEnum = enum tmMatch, tmConvertToString, tmNoMatch
 
@@ -194,15 +158,9 @@ macro format*(formatString: string{lit}, args: varargs[expr]): expr =
 
     inc i
 
-  echo " *** Generated call: ", result.treerepr
+  echo " *** generated by 'format': ", result.treerepr
 
 
-when false:
-  #let s = format("%3d %8.3fX", (42+1), 3.14*1.0)
-  #let s = format("%3d %8.3fX %s", (42+1), 3.14*1.0, @[1,2,3])
-  let s = format("%12d %s %s %5.3e", 42.int16, 3.14*1.0, @[1,2,3], 1.234)
-  echo s.len
-  echo s
 
 
 
@@ -215,16 +173,13 @@ const
    ## maybe these characters should be exported in a single place?
 
 
-
-
-
 proc isValidExpr(s: string): bool {.compileTime.} =
+  ## static helper function to check if an expression is valid
   try:
     discard parseExpr(s)
     return true
   except ValueError:
     return false
-
 
 
 macro ifmt*(formatStringNode: string): expr =
@@ -244,7 +199,7 @@ macro ifmt*(formatStringNode: string): expr =
 
   while i < formatString.len:
     let c = formatString[i]
-    echo c, " state: ", state
+    #echo c, " state: ", state
     case state
 
     of psNeutral:
@@ -283,9 +238,9 @@ macro ifmt*(formatStringNode: string): expr =
       elif c == '%':
         outArgs.add(newIdentNode(buffer))
         let substr = formatString[i+1..^1]
-        echo "substr: ", substr
+        #echo "substr: ", substr
         let formatter = parseFormatString(substr)
-        echo "formatter: ", formatter
+        #echo "formatter: ", formatter
         
         case formatter.kind:
         of fsMatch:  # if we have a valid format string: append it and inc by '%' + formatter.len
@@ -307,7 +262,6 @@ macro ifmt*(formatStringNode: string): expr =
         # check for '$'.
 
     of psExpr:
-      echo "current expr: ", buffer
       if c == '}' and buffer.isValidExpr:
         outArgs.add(parseExpr(buffer))
         state = psNeutral
@@ -317,9 +271,9 @@ macro ifmt*(formatStringNode: string): expr =
           let c = formatString[i]
           if c == '%':
             let substr = formatString[i+1..^1]
-            echo "substr: ", substr
+            #echo "substr: ", substr
             let formatter = parseFormatString(substr)
-            echo "formatter: ", formatter
+            #echo "formatter: ", formatter
 
             case formatter.kind:
             of fsMatch:  # if we have a valid format string: append it and inc by '%' + formatter.len
@@ -348,16 +302,71 @@ macro ifmt*(formatStringNode: string): expr =
   elif state == psOneDollar or state == psExpr:
     error "format string is not properly terminated"
 
-
-  echo " *** outFmtStr: ", outFmtStr
-  echo " *** outArgs: ", outArgs.repr
-
+  # generate call to "format" template and add arguments
   result = newCall("format", newStrLitNode(outFmtStr))
-
   for arg in outArgs:
     result.add(arg)
 
-  echo result.treeRepr
+  echo " *** outFmtStr: ", outFmtStr
+  echo " *** outArgs: ", outArgs.repr
+  echo " *** generated by 'ifmt': ", result.treeRepr
+
+
+
+
+
+
+
+
+when false:
+  let strings = [
+    "%asdf",
+    "ddd",
+    " d",
+    " +-0#d",
+    "f",
+    "d",
+    "s",
+    "5f",
+    "5.1f",
+    ".2f",
+    "50.20f",
+    "5.2.2f",
+    "5.f",
+    "zu",
+    "zzu",
+    "hhd",
+    "hhhhd",
+  ]
+  for s in strings:
+    let m = parseFormatString(s)
+    let m2 = parseFormatString(s)
+    echo "Expression: '", s, "' => ", m, " match len: ", m.len, "   ", m2
+    #assert m.kind == m2.kind
+    #assert m.len == m2.len
+
+
+
+# TODO: make some unittests
+when false:
+  let s = formatUnsafe("%3d %8.3fX", 42+1, 3.14)
+  echo formatUnsafe("%3d %12.3fX", 42, 3.14)
+  echo s.len
+  echo s
+
+  var digits = 15
+  echo formatUnsafe("%" & $digits & "d", 1_000_000)
+
+  echo formatUnsafe("Hallo 1%% Test")
+
+
+when false:
+  #let s = format("%3d %8.3fX", (42+1), 3.14*1.0)
+  #let s = format("%3d %8.3fX %s", (42+1), 3.14*1.0, @[1,2,3])
+  let s = format("%12d %s %s %5.3e", 42.int16, 3.14*1.0, @[1,2,3], 1.234)
+  echo s.len
+  echo s
+
 
 block:
   let x = 1
