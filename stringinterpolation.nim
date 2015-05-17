@@ -52,7 +52,7 @@ proc extractFormatStrings(s: string): seq[FormatStringMatch] =
     let c = s[i]
     #echo s, i, c, result
     if c == '%':
-      let m = parseFormatString(s[i+1..^1]) 
+      let m = parseFormatString(s[i+1..^1])
       if m.kind == fsMatch:
         result.add(m)
       i += m.len
@@ -78,7 +78,7 @@ template formatUnsafe*(formatString: string, args: varargs[expr]): string =
   ## this allows to pass a formatString which is not a static literal.
   ## This means that it is possible to use dynamic string format strings, e.g.
   ## formatUnsafe("%" & $dynamicNumberOfDigits & "d", 1_000_000)
-  
+
   # determine the required size first
   let requiredSize = appendVarargs(snprintf(nil, 0, formatString), args)
   # note: method call syntax passes a different tree!
@@ -104,7 +104,7 @@ macro format*(formatString: string{lit}, args: varargs[expr]): expr =
   #echo formatString.strval
   let formatStrings = extractFormatStrings(formatString.strval)
   #echo formatStrings
-  #echo formatStrings.len, " == ", args.len 
+  #echo formatStrings.len, " == ", args.len
   if formatStrings.len != args.len:
     error "number of varargs ("  & $args.len & ") does not match number of string formatters (" & $formatStrings.len & ")"
 
@@ -241,7 +241,7 @@ macro ifmt*(formatStringNode: string): expr =
         #echo "substr: ", substr
         let formatter = parseFormatString(substr)
         #echo "formatter: ", formatter
-        
+
         case formatter.kind:
         of fsMatch:  # if we have a valid format string: append it and inc by '%' + formatter.len
           outFmtStr.add('%' & formatter.s)
