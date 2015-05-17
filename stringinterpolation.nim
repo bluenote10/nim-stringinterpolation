@@ -29,6 +29,10 @@ proc typeSpecifier(m: FormatStringMatch): char =
 proc parseFormatString(s: string): FormatStringMatch =
   ## helper function tries to parse a printf format string
   ## from the beginning of ``s``.
+  ##
+  ## This is still completely stupid (only tests for the terminating character)
+  ## In the long term I plan to add a more thorough validation of
+  ## the format strings...
   if s[0] == '%':
     return FormatStringMatch(kind: fsPct)
 
