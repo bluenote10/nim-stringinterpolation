@@ -24,9 +24,9 @@ Basically there are three formatting templates/macros:
 
 - `formatUnsafe*(formatString: string, args: varargs[expr]): string`
   
-  This template provides a simple wrapper for `snprint`. 
+  This template provides a simple wrapper for `snprintf`. 
   No type checking is performed, allowing to use dynamic format strings.
   Internally, the template takes a two-step approach:
-  In a first call to `snprint` a fixed size (256) buffer is provided.
-  If `snprint` reports that the buffer was too small, a second call is performed with the exactly the size required.
+  In a first call to `snprintf` a fixed size (256) buffer is provided.
+  If `snprintf` reports that the buffer was too small, a second call is performed with the exactly the size required.
   As a result, there is no limitation on the maximum string size of the arguments.
