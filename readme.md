@@ -35,4 +35,3 @@ Basically there are three formatting templates/macros:
 
 - The validation of printf formatters is still very basic. Lots of room for improvement.
 - Much more testing is required, especially regarding various type checks.
-- Nimble integration
