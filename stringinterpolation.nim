@@ -313,7 +313,7 @@ macro ifmt*(formatStringNode: string): expr =
     error "format string contains an invalid or incomplete expression \"{" & buffer & "\""
 
   # generate call to "format" template and add arguments
-  result = newCall("format", newStrLitNode(outFmtStr))
+  result = newCall(bindSym"format", newStrLitNode(outFmtStr))
   for arg in outArgs:
     result.add(arg)
 
