@@ -174,7 +174,6 @@ macro format*(formatString: string{lit}, args: varargs[expr]): expr =
 
 
 const
-  Whitespace = {' ', '\t', '\v', '\r', '\l', '\f'}
   IdentChars = {'a'..'z', 'A'..'Z', '0'..'9', '_'}
   IdentStartChars = {'a'..'z', 'A'..'Z', '_'}
    ## copied from parseutils, which copied from strutils
@@ -198,7 +197,7 @@ macro ifmt*(formatStringNode: string): expr =
     ParseState = enum
       psNeutral, psOneDollar, psIdent, psExpr
 
-  var state = psNeutral
+  var state: ParseState = psNeutral
   var buffer = ""
   var i = 0
 
