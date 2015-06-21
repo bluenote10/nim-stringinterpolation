@@ -116,7 +116,7 @@ macro format*(formatString: string{lit}, args: varargs[expr]): expr =
   if formatStrings.len != args.len:
     error "number of varargs ("  & $args.len & ") does not match number of string formatters (" & $formatStrings.len & ")"
 
-  result = newCall("formatUnsafe", formatString)
+  result = newCall(bindSym"formatUnsafe", formatString)
 
   var i = 0
   for fs in formatStrings:
